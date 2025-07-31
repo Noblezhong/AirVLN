@@ -21,7 +21,7 @@ class Param:
         self.parser.add_argument('--maxAction', type=int, default=500, help='max action sequence')
 
         self.parser.add_argument("--dagger_it", type=int, default=1)
-        self.parser.add_argument("--epochs", type=int, default=10)
+        self.parser.add_argument("--epochs", type=int, default=1)
         self.parser.add_argument('--lr', type=float, default=0.00025, help="learning rate")
         self.parser.add_argument('--batchSize', type=int, default=8)
         self.parser.add_argument("--trainer_gpu_device", type=int, default=0, help='GPU')
@@ -36,8 +36,8 @@ class Param:
         self.parser.add_argument('--nav_graph_path', type=str, default=str(project_prefix / 'DATA/data/disceret/processed/nav_graph_10'), help="nav_graph path")
         self.parser.add_argument('--token_dict_path', type=str, default=str(project_prefix / 'DATA/data/disceret/processed/token_dict_10'), help="token_dict path")
         self.parser.add_argument('--vertices_path', type=str, default=str(project_prefix / 'DATA/data/disceret/scene_meshes'))
-        self.parser.add_argument('--dagger_mode_load_scene', nargs='+', default=[])
-        self.parser.add_argument('--dagger_update_size', type=int, default=8000)
+        self.parser.add_argument('--dagger_mode_load_scene', nargs='+', default=[1])
+        self.parser.add_argument('--dagger_update_size', type=int, default=4000)
         self.parser.add_argument('--dagger_mode', type=str, default="end", help='dagger mode in [end middle nearest]')
         self.parser.add_argument('--dagger_p', type=float, default=1.0, help='dagger p')
 
@@ -96,8 +96,8 @@ args.machines_info = [
 ]
 
 
-args.TRAIN_VOCAB = Path(args.project_prefix) / 'DATA/data/aerialvln/train_vocab.txt'
-args.TRAINVAL_VOCAB = Path(args.project_prefix) / 'DATA/data/aerialvln/train_vocab.txt'
+args.TRAIN_VOCAB = Path(args.project_prefix) / 'DATA/data/aerialvln-s/train_vocab.txt'
+args.TRAINVAL_VOCAB = Path(args.project_prefix) / 'DATA/data/aerialvln-s/train_vocab.txt'
 args.vocab_size = 10038
 
 

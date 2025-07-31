@@ -17,6 +17,10 @@ SCENE_IDS = [
     22, 23, 24, 25, 26
 ]
 
+# SCENE_IDS = [
+#     1
+# ]
+
 
 @nb.njit(nogil=True, cache=True)
 def EuclideanDistance3(point_a: np.array, point_b: np.array) -> float:
@@ -67,6 +71,12 @@ class ShortestPathSensor:
         return content_graph, content_dict
 
     def _BuildNXGraphs(self, scene_ids=SCENE_IDS):
+
+        # print("外部传入 scene_ids = ", scene_ids)
+        # scene_ids = [1]
+        # print("实际使用 scene_ids = ", scene_ids)
+
+
         graphs = {}
         token_dicts = {}
 

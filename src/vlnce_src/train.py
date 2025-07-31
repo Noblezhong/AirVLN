@@ -476,6 +476,9 @@ def collect_data(data_it=0):
     logger.info(args)
 
     train_env = initialize_env(split='train')
+
+    # train_env = initialize_env(split=args.train_split)
+
     trainer = initialize_trainer()
 
     if torch.cuda.is_available():
