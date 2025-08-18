@@ -167,6 +167,7 @@ class Seq2SeqNet(nn.Module):
         else:
             rgb_embedding = self.rgb_encoder(observations)
 
+        # sed2seq本质上就是把各个模式的输入拼接起来
         x = torch.cat(
             [instruction_embedding, depth_embedding, rgb_embedding], dim=1
         )

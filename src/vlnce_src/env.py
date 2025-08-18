@@ -26,6 +26,7 @@ from utils.env_vector import VectorEnvUtil
 from utils.shorest_path_sensor import EuclideanDistance3
 
 
+# 从splits中导入训练数据，@后数字表示从其中取出的数据条目数
 def load_my_datasets(splits):
     import random
     data = []
@@ -73,21 +74,27 @@ class AirVLNENV:
         # args.vocab_size = self.vocab['num_vocab']
         logger.info('Loaded with {} instructions, using split: {}'.format(len(load_data), split))
 
+        # 对从train.json中原始数据按episode进行筛选、编码，保存在self.data中
         self.index_data = 0
         self.data = []
         pbar = tqdm.tqdm(total=len(self.ori_raw_data))
         for i_item, item in enumerate(self.ori_raw_data):
+            # 按照TF_mode_load_scene中指定的场景来过滤数据
+
+            # Teacher Forcing mode
             if args.collect_type in ['TF']:
                 if len(list(args.TF_mode_load_scene)) > 0 and str(item['scene_id']) not in list(args.TF_mode_load_scene):
                     pbar.update()
                     continue
 
+            # dagger and self feeding mode
             if args.collect_type in ['dagger', 'SF']:
                 if len(list(args.dagger_mode_load_scene)) > 0 and str(item['scene_id']) not in list(args.dagger_mode_load_scene):
                     pbar.update()
                     continue
 
             new_item = dict(item).copy()
+            # 根据是否启用bert编码来使用tokenizer
             if args.tokenizer_use_bert:
                 text = item['instruction']['instruction_text']
                 instruction_tokens = tokenizer(
@@ -104,6 +111,7 @@ class AirVLNENV:
             pbar.update()
         pbar.close()
 
+        # 做trajectory_id到instruction与episode_id的映射
         self.trajectory_id_2_instruction_tokens = {}
         self.trajectory_id_2_episode_ids = {}
         for i_item, item in enumerate(self.data):
@@ -127,6 +135,7 @@ class AirVLNENV:
                     item['episode_id']
                 )
 
+        # 打乱数据，并将数据根据场景id按组分配
         random.shuffle(self.data)
         if args.EVAL_NUM != -1 and int(args.EVAL_NUM) > 0:
             [random.shuffle(self.data) for i in range(10)]
@@ -154,6 +163,7 @@ class AirVLNENV:
 
         if args.collect_type in ['TF']:
 
+            # 为轨迹特征、RGB图像和深度图像创建LMDB数据库，并写入初始环境
             if args.run_type in ['collect']:
                 self.lmdb_features_dir = str(Path(args.project_prefix) / 'DATA' / 'img_features' / str(args.run_type) / str(args.name) / str(split))
                 self.lmdb_rgb_dir = str(Path(args.project_prefix) / 'DATA' / 'img_features' / str(args.run_type) / str(args.name) / (str(split)+'_rgb'))
@@ -166,6 +176,7 @@ class AirVLNENV:
                 if not os.path.exists(str(self.lmdb_depth_dir)):
                     os.makedirs(str(self.lmdb_depth_dir), exist_ok=True)
 
+                # 所以这个repo执行条件就是很苛刻，光收集轨迹就要几百G的储存空间
                 lmdb_features_map_size = 5.0e12  # 1.0e11  100GB
                 lmdb_rgb_map_size = 5.0e12  # 1.0e11  100GB
                 lmdb_depth_map_size = 5.0e12  # 1.0e11  100GB
@@ -284,7 +295,7 @@ class AirVLNENV:
         import gc
         gc.collect()
 
-    #
+    # 批量获取episode来训练
     def next_minibatch(self, skip_scenes=[], data_it=0):
         batch = []
 
@@ -312,6 +323,7 @@ class AirVLNENV:
                 self.index_data += 1
                 continue
 
+            # 检查采集的数据在保存lmdb数据库中是否已有
             if args.run_type in ['collect', 'train'] and args.collect_type in ['TF']:
                 lmdb_key = '{}'.format(new_episode['episode_id'])
                 if lmdb_key in self.lmdb_collected_keys:
@@ -374,7 +386,7 @@ class AirVLNENV:
             cnt += len(item['open_scenes'])
         assert self.batch_size == cnt, 'error create machines_info'
 
-        #
+        # 判断是否可以复用当前场景，满足条件就直接复用
         if self.this_scene_used_cnt < self.one_scene_could_use_num and \
                 len(set(scene_id_list)) == 1 and len(set(self.last_scene_id_list)) == 1 and \
                 scene_id_list[0] is not None and self.last_scene_id_list[0] is not None and scene_id_list[0] == self.last_scene_id_list[0] and \
@@ -390,6 +402,7 @@ class AirVLNENV:
             try:
                 self.machines_info = copy.deepcopy(machines_info)
                 if (not args.ablate_rgb or not args.ablate_depth):
+                    # client类在这里面实例化的
                     self.simulator_tool = AirVLNSimulatorClientTool(machines_info=self.machines_info)
                     self.simulator_tool.run_call()
                 break
@@ -403,6 +416,7 @@ class AirVLNENV:
         self.last_scene_id_list = scene_id_list.copy()
         self.this_scene_used_cnt = 1
 
+    # 设置环境中无人机的初始位置，并初始化状态记录
     def _setEpisodes(self):
         start_position_list = [item['start_position'] for item in self.batch]
         start_rotation_list = [item['start_rotation'] for item in self.batch]
@@ -470,6 +484,7 @@ class AirVLNENV:
 
         return obs
 
+    # 从scene中拿到图像与环境状态，并在特定情况存入LMDB数据库中
     def _getStates(self):
         while True:
             if (not args.ablate_rgb or not args.ablate_depth):
@@ -524,10 +539,11 @@ class AirVLNENV:
 
                 state = self.sim_states[cnt]
 
+                # 组装当前state
                 states[cnt] = (_rgb_image, _depth_image, state)
                 cnt += 1
 
-                #
+                # 在collect.sh中保存数据到lmdb数据库中
                 if self.split in ['train'] and args.run_type in ['collect'] and args.collect_type in ['TF']:
                     trajectory_id = state.episode_info['trajectory_id']
                     step = state.step
@@ -588,7 +604,7 @@ class AirVLNENV:
                 logger.error('Failed to reset to this pose')
                 self.reset_to_this_pose(poses)
 
-
+    # agent应用action于环境中，然后更新相关的状态
     def makeActions(self, action_list):
         #
         poses = []
@@ -622,7 +638,7 @@ class AirVLNENV:
                 logger.error('Failed to set poses')
                 self.reset_to_this_pose(poses_formatted)
 
-        #
+        # 更新内部状态
         for index, action in enumerate(action_list):
             if self.sim_states[index].is_end == True:
                 continue
@@ -643,7 +659,7 @@ class AirVLNENV:
             self.update_measurements()
 
 
-    #
+    # 下面都是定义评估指标的地方了
     def update_measurements(self):
         self._update_DistanceToGoal()
         self._updata_Success()
@@ -664,6 +680,7 @@ class AirVLNENV:
 
             if self.sim_states[i].DistanceToGoal['_previous_position'] is None or \
                 not np.allclose(self.sim_states[i].DistanceToGoal['_previous_position'], current_position, atol=1):
+                # 计算的是平面欧氏距离，忽略了高度差
                 distance_to_target = EuclideanDistance3(
                     np.array(current_position)[0:2],
                     np.array(state.episode_info['goals'][0]['position'])[0:2]

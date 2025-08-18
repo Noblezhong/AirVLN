@@ -134,7 +134,7 @@ class VLNCETrainer:
     def load_checkpoint(self, checkpoint_path, *args, **kwargs) -> Dict:
         return torch.load(checkpoint_path, *args, **kwargs)
 
-    #
+    # RL中policy network的一次训练步
     def _update_agent(
         self,
         observations,

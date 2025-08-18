@@ -120,7 +120,7 @@ class AirVLNSimulatorClientTool:
         self._closeConnection()
 
         def _run_command(index, socket_client: msgpackrpc.Client):
-            logger.info(f'Failed to open scenes, machine {index}: {socket_client.address._host}:{socket_client.address._port}')
+            logger.info(f'Trying to open scenes on machine {index}: {socket_client.address._host}:{socket_client.address._port}')
             result = socket_client.call('reopen_scenes', socket_client.address._host, self.machines_info[index]['open_scenes'])
 
             if result[0] == False:
@@ -142,7 +142,7 @@ class AirVLNSimulatorClientTool:
                 else:
                     self.airsim_clients[index][i] = airsim.VehicleClient(ip=ip, port=port, timeout_value=airsim_timeout)
 
-            logger.info(f'Failed to open scenes, machine {index}: {socket_client.address._host}:{socket_client.address._port}')
+            logger.info(f'Successfully open scenes on machine {index}: {socket_client.address._host}:{socket_client.address._port}')
             return
 
         threads = []

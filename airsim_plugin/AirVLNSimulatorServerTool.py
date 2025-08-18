@@ -270,7 +270,7 @@ def KillAirVLN() -> None:
     time.sleep(1)
     return
 
-
+# 核心逻辑
 class EventHandler(object):
     def __init__(self):
         scene_ports = []
@@ -426,7 +426,7 @@ class EventHandler(object):
         threads = []
 
         # ChangeNice(ports)
-
+        # 记录这次打开的端口，下次再启动会把他们先kill释放掉
         self.scene_used_ports += copy.deepcopy(ports)
 
         return True, (ip, ports)
@@ -531,7 +531,7 @@ if __name__ == '__main__':
         gpu_list.append(int(gpu.strip()))
     GPU_IDS = gpu_list.copy()
 
-
+    # 初始化 RPC 服务：获取服务地址、创建 EventHandler 实例并启动 RPC 服务器，返回监听服务的线程
     addr, server, thread = serve()
     print(f"start listening \t{addr._host}:{addr._port}")
 

@@ -34,6 +34,7 @@ from src.vlnce_src.util import read_vocab, Tokenizer
 
 
 def setup():
+    # 初始化pytorch分布式训练环境
     init_distributed_mode()
 
     seed = 100 + get_rank()
@@ -471,7 +472,7 @@ def initialize_trainer():
     logger.info('initialize_trainer over')
     return trainer
 
-
+# collect.sh执行的收集轨迹的函数
 def collect_data(data_it=0):
     logger.info(args)
 
@@ -485,6 +486,7 @@ def collect_data(data_it=0):
         with torch.cuda.device(trainer.device):
             torch.cuda.empty_cache()
 
+    # 用于捕获模型中间层的输出
     def hook_builder(tgt_tensor):
         def hook(m, i, o):
             tgt_tensor.set_(o.cpu())
@@ -511,7 +513,7 @@ def collect_data(data_it=0):
     beta = 1.0
 
 
-    #
+    # 准备训练样本
     with torch.no_grad():
         end_iter = len(train_env.data)
         pbar = None
@@ -554,6 +556,7 @@ def collect_data(data_it=0):
             else:
                 raise NotImplementedError
 
+            # 初始化环境状态
             episodes = [[] for _ in range(train_env.batch_size)]
             skips = [False for _ in range(train_env.batch_size)]
             dones = [False for _ in range(train_env.batch_size)]
@@ -565,6 +568,7 @@ def collect_data(data_it=0):
 
             ended = False
 
+            # 将batch轨迹储存进lmdb数据库（针对中途结束的场景）
             for t in range(int(args.maxAction) + 1):
                 logger.info('{} - {} / {}'.format(int(train_env.index_data)-int(train_env.batch_size), t, end_iter))
 
@@ -572,8 +576,10 @@ def collect_data(data_it=0):
                     if dones[i] and not skips[i]:
                         if args.collect_type in ['TF']:
                             _episodes = episodes[i].copy()
+                            # 同一个trajectory会有多个语言表示
                             for _i, _j in enumerate(train_env.trajectory_id_2_instruction_tokens[infos[i]['trajectory_id']]):
                                 for __i, __j in enumerate(_episodes):
+                                    # 把episode中observation的每一帧都替换成instruction指令
                                     _episodes[__i][0]['instruction'] = _j
 
                                 ep = _episodes.copy()
@@ -671,6 +677,7 @@ def collect_data(data_it=0):
                             envs_to_pause.append(i)
                             skips[i] = True
 
+                # 检查batch中的所有环境是否都结束？
                     if np.array(dones).all():
                         ended = True
 
@@ -684,6 +691,7 @@ def collect_data(data_it=0):
                     not_done_masks,
                     deterministic=False,
                 )
+                # 让所有的action都变成教师策略
                 actions = torch.where(
                     torch.rand_like(actions, dtype=torch.float) < beta,
                     batch['teacher_action'].long(),
@@ -702,6 +710,7 @@ def collect_data(data_it=0):
                     if i in envs_to_pause:
                         continue
 
+                    # 更新episode
                     episodes[i].append(
                         (
                             observations[i],
@@ -728,6 +737,7 @@ def collect_data(data_it=0):
                     device=trainer.device,
                 )
 
+            # 当一个episode结束时，将其存入lmdb数据库
             for i in range(train_env.batch_size):
                 if dones[i] and not t >= int(args.maxAction):
                     continue

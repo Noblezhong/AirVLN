@@ -18,6 +18,7 @@ class Param:
         self.parser.add_argument('--name', type=str, default='default', help='experiment name')
 
         self.parser.add_argument('--maxInput', type=int, default=300, help="max input instruction")
+        # 每条episode允许执行的最大Action数
         self.parser.add_argument('--maxAction', type=int, default=500, help='max action sequence')
 
         self.parser.add_argument("--dagger_it", type=int, default=1)
