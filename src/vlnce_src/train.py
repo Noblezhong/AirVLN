@@ -45,7 +45,7 @@ def setup():
     cudnn.benchmark = False
     cudnn.deterministic = False
 
-
+# 分布式训练用,以数据并行的方式进行训练
 class DDPIWTrajectoryDataset(torch.utils.data.IterableDataset):
     def __init__(
         self,
@@ -172,7 +172,7 @@ class DDPIWTrajectoryDataset(torch.utils.data.IterableDataset):
 
         return self
 
-
+# 非分布式训练用到的数据集类
 class IWTrajectoryDataset(torch.utils.data.IterableDataset):
     def __init__(
         self,
@@ -186,13 +186,14 @@ class IWTrajectoryDataset(torch.utils.data.IterableDataset):
 
         self.lmdb_features_dir = lmdb_features_dir
         self.lmdb_map_size = lmdb_map_size
-        self.preload_size = batch_size * 100
+        self.preload_size = batch_size * 100 # 预加载块大小
         self._preload = []
         self.batch_size = batch_size
 
         self.keys = []
         self.seed = 1
 
+        # 拐点权重技巧，让模型更能学习拐弯的相关信息
         if use_iw:
             self.inflec_weights = torch.tensor([1.0, inflection_weight_coef])
         else:
@@ -211,12 +212,14 @@ class IWTrajectoryDataset(torch.utils.data.IterableDataset):
                 pbar.update()
                 self.keys.append(key.decode())
 
+        # 记录导入lmdb数据keys的总数目length
         self.length = len(self.keys)
 
         self.iter_start = 0
         self.iter_end = self.length
         logger.warning("END init Dataset \t start({}) - end({})".format(self.iter_start, self.iter_end))
 
+    # 将lmdb数据分块读取，并将长度相近的条目排在一起，然后再注入点随机性
     def _load_next(self):
         if len(self._preload) == 0:
             if len(self.load_ordering) == 0:
@@ -249,6 +252,7 @@ class IWTrajectoryDataset(torch.utils.data.IterableDataset):
 
                     lengths.append(len(new_preload[-1][0]))
 
+            # 排序+随机化
             sort_priority = list(range(len(lengths)))
             random.shuffle(sort_priority)
 
@@ -877,6 +881,7 @@ def train_vlnce():
 
     trainer = initialize_trainer()
 
+    # data aggregation
     for dagger_it in range(int(args.dagger_it)):
         step_id = 0
 
@@ -887,6 +892,7 @@ def train_vlnce():
 
         lmdb_features_dir = str(Path(args.project_prefix) / 'DATA/img_features/collect/{}/train'.format(args.name))
         assert os.path.exists(str(lmdb_features_dir))
+        # 训练数据加载初始化
         if args.DistributedDataParallel:
             dataset = DDPIWTrajectoryDataset(
                 lmdb_features_dir,
@@ -923,6 +929,7 @@ def train_vlnce():
             )
 
         AuxLosses.activate()
+        # 这只是记录了一次data aggregation中的epoch
         for epoch in tqdm.trange(int(args.epochs), dynamic_ncols=True):
             batch_cnt = 0
             for batch in tqdm.tqdm(
@@ -999,6 +1006,7 @@ def train_vlnce():
                 step_id += 1
                 batch_cnt += 1
 
+            # 每5个epoch保存一个checkpoint
             if is_main_process():
                 if ((dagger_it * args.epochs + epoch)+1) % 5 == 0:
                     trainer.save_checkpoint(

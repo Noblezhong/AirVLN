@@ -512,7 +512,7 @@ def initialize_trainer(dagger_it=0, checkpoint_folder=None):
     logger.info('initialize_trainer over')
     return trainer
 
-
+# 按照Dagger方法生成混合环境数据
 def collect_data(trainer, train_env, data_it=0):
     if torch.cuda.is_available():
         with torch.cuda.device(trainer.device):
@@ -544,9 +544,11 @@ def collect_data(trainer, train_env, data_it=0):
     if args.collect_type == 'dagger':
         p = float(args.dagger_p)
         # beta = 0.0 if p == 0.0 else p ** data_it
+        # 第1轮完全使用专家策略
         if data_it == 0:
             beta = 1.0
         else:
+            # 后续以概率p用专家策略
             beta = 0.0 if p == 0.0 else p
     elif args.collect_type == 'SF':
         p = 0.0
@@ -726,6 +728,7 @@ def collect_data(trainer, train_env, data_it=0):
                     not_done_masks,
                     deterministic=False,
                 )
+                # 真实与专家动作混合
                 actions = torch.where(
                     torch.rand_like(actions, dtype=torch.float) < beta,
                     batch['teacher_action'].long(),
@@ -871,7 +874,7 @@ def collect_data(trainer, train_env, data_it=0):
     if depth_hook is not None:
         depth_hook.remove()
 
-    #
+    # 在第一次（0）次数据聚合时对原始数据集进行备份
     if dagger_it == 0 and is_main_process():
         try:
             copytree_src = str(Path(str(train_env.lmdb_features_dir)).parent)
@@ -1428,6 +1431,7 @@ if __name__ == "__main__":
         train_env = initialize_env(split='train')
 
         for dagger_it in range(int(args.dagger_it)):
+            # 跳过完成的若干dagger轮
             if args.continue_start_from_dagger_it is not None and args.continue_start_from_checkpoint_path is not None:
                 if dagger_it < args.continue_start_from_dagger_it:
                     continue
@@ -1446,6 +1450,7 @@ if __name__ == "__main__":
             checkpoint_folder = Path(args.project_prefix) / 'DATA/output/{}/train/checkpoint/{}'.format(args.name, config.make_dir_time)
             trainer = initialize_trainer(dagger_it=dagger_it, checkpoint_folder=checkpoint_folder)
 
+            # 
             collect_data(trainer, train_env, dagger_it)
 
             #
@@ -1459,6 +1464,7 @@ if __name__ == "__main__":
                 torch.distributed.destroy_process_group()
 
             world_size = torch.cuda.device_count()
+            # 启动多进程训练，每个GPU分配一个进程
             mp.spawn(
                 train_vlnce,
                 args=(world_size, dagger_it, config),

@@ -4,7 +4,7 @@
 # cd ./AirVLN
 echo $PWD
 
-
+# 遵循TF模式粗略训练出一个“入门” policy network
 python -u ./src/vlnce_src/train.py \
 --run_type train \
 --policy_type seq2seq \
@@ -20,6 +20,7 @@ python -u ./src/vlnce_src/train.py \
 
 nohup python -u ./airsim_plugin/AirVLNSimulatorServerTool.py --gpus 0 &
 
+# 以Dagger方法训练出policy network（从零开始）
 python -u ./src/vlnce_src/dagger_train.py \
 --run_type train \
 --policy_type seq2seq \
