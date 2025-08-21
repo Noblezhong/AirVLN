@@ -7,6 +7,8 @@ echo $PWD
 
 nohup python -u ./airsim_plugin/AirVLNSimulatorServerTool.py --gpus 0 &
 
+
+# collect-type只管如何去收集训练轨迹，评估阶段用不到这个参数，但是我改成dagger会跑不通
 python -u ./src/vlnce_src/train.py \
 --run_type eval \
 --policy_type seq2seq \

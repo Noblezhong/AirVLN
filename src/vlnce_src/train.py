@@ -1059,6 +1059,8 @@ def eval_vlnce():
         from Model.utils.common import poll_checkpoint_folder
 
         # evaluate multiple checkpoints in order
+        # 取一个checkpoint评估一次
+        # 一直评估，未设置退出逻辑
         prev_ckpt_ind = -1
         while True:
             current_ckpt = None
@@ -1070,6 +1072,7 @@ def eval_vlnce():
             logger.info(f"=======current_ckpt: {current_ckpt}=======")
             prev_ckpt_ind += 1
 
+            # 前两个checkpoint直接跳过不去评估
             if prev_ckpt_ind <= 2:
                 continue
 
@@ -1121,7 +1124,7 @@ def _eval_checkpoint(
         return
 
 
-    #
+    # 把模型开启为评估模式
     trainer = VLNCETrainer(
         load_from_ckpt=True,
         observation_space=train_env.observation_space,
@@ -1155,6 +1158,7 @@ def _eval_checkpoint(
                 logger.warning('train_env.batch is None, going to break and stop collect')
                 break
 
+            # RL环境初始化
             if args.policy_type in ['seq2seq', 'cma']:
                 rnn_states = torch.zeros(
                     train_env.batch_size,
@@ -1193,6 +1197,7 @@ def _eval_checkpoint(
             for t in range(int(args.maxAction)):
                 logger.info('checkpoint_index:{} \t {} - {} / {} \t {}'.format(checkpoint_index, idx, t, end_iter, not_done_masks.cpu().numpy().reshape((-1,)).tolist()))
 
+                # 预测动作
                 actions, rnn_states = trainer.policy.act(
                     batch,
                     rnn_states,
@@ -1252,6 +1257,7 @@ def _eval_checkpoint(
                     ended = True
                     break
 
+            # 把后续的每个episode的记过保存到stats_episode中
             for t in range(int(train_env.batch_size)):
                 stats_episodes[str(train_env.batch[t]['episode_id'])] = infos[t]
 
@@ -1282,6 +1288,7 @@ def _eval_checkpoint(
                         tb_writer=writer,
                     )
 
+                # 这些指标在与agent交互时已经在ENV中算出来了
                 logger.info((
                     'result-{} \t' +
                     'distance_to_goal: {} \t' +
@@ -1331,6 +1338,7 @@ def _eval_checkpoint(
         new_stats_episodes[i] = temp_1.copy()
     stats_episodes = new_stats_episodes.copy()
 
+    # 对intermediate中的所有指标取均值,得到整体表现
     aggregated_stats = {}
     num_episodes = len(stats_episodes)
     for stat_key in next(iter(stats_episodes.values())).keys():
